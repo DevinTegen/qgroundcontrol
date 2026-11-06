@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Run real ArduPilot SITL with the AIGC Web app in front of it.
 #
-#   tools/aigc/run_sitl.sh [plane|wing|quadplane|tailsitter|copter] [--home LAT,LON,ALT,HDG] [--wipe] [--build-only]
+#   tools/aigc/run_sitl.sh [plane|wing|quadplane|tailsitter|copter] [--home pendleton|cmac|LAT,LON,ALT,HDG] [--wipe] [--build-only]
 #
+# The aircraft starts at Pendleton, Oregon (KPDT, runway 25 threshold, facing west) unless --home says otherwise.
 # First run downloads and builds ArduPilot (5-10 minutes); later runs start in seconds.
 # Then open http://127.0.0.1:5761/ (or the forwarded port in a Codespace) and press Connect.
 # Desktop AIGC/QGroundControl/Mission Planner can connect to tcp 127.0.0.1:5762 at the same time.
@@ -10,7 +11,7 @@ set -euo pipefail
 
 VEHICLE="${1:-plane}"
 shift || true
-HOME_LOC=""
+HOME_LOC="${AIGC_SITL_HOME:-pendleton}"
 WIPE=""
 BUILD_ONLY=0
 while [[ $# -gt 0 ]]; do
@@ -21,6 +22,11 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option $1" >&2; exit 2 ;;
     esac
 done
+
+case "$HOME_LOC" in
+    pendleton) HOME_LOC="45.69533,-118.82867,453,270" ;;  # KPDT runway 25 threshold
+    cmac)      HOME_LOC="-35.363261,149.165230,584,353" ;; # ArduPilot's default field in Canberra
+esac
 
 PLANE_TAG="${AIGC_PLANE_TAG:-Plane-4.6.3}"
 COPTER_TAG="${AIGC_COPTER_TAG:-Copter-4.6.3}"

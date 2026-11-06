@@ -268,9 +268,10 @@ export function initFly({ getVehicle, onStatus }) {
     const span = Math.max(200, ...track.map((p) => Math.max(Math.abs(p.lat - centerLat) * mPerDegLat, Math.abs(p.lon - centerLon) * mPerDegLon) * 2.4));
     const scale = Math.min(w, h) / span;
     const xy = (lat, lon) => [w / 2 + (lon - centerLon) * mPerDegLon * scale, h / 2 - (lat - centerLat) * mPerDegLat * scale];
+    const tilesDrawn = drawTiles(g, w, h, centerLat, centerLon, scale);
     // grid every 100 m (or 500 m when zoomed out)
     const step = span > 2000 ? 500 : 100;
-    g.strokeStyle = '#162038';
+    g.strokeStyle = tilesDrawn ? 'rgba(11,18,34,0.25)' : '#162038';
     for (let m = -Math.ceil(span / step) * step; m <= span; m += step) {
       g.beginPath(); g.moveTo(w / 2 + m * scale, 0); g.lineTo(w / 2 + m * scale, h); g.stroke();
       g.beginPath(); g.moveTo(0, h / 2 + m * scale); g.lineTo(w, h / 2 + m * scale); g.stroke();
@@ -297,8 +298,75 @@ export function initFly({ getVehicle, onStatus }) {
     g.moveTo(0, -12); g.lineTo(8, 10); g.lineTo(0, 5); g.lineTo(-8, 10); g.closePath();
     g.fill();
     g.restore();
-    g.fillStyle = '#8a9bb8';
-    g.fillText(`grid ${step} m · ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`, 8, h - 8);
+    const label = `grid ${step} m · ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`;
+    g.fillStyle = 'rgba(11,18,34,0.75)';
+    g.fillRect(0, h - 20, w, 20);
+    g.fillStyle = '#c7d2e5';
+    g.fillText(label, 8, h - 6);
+    if (tilesDrawn) {
+      const attribution = '© OpenStreetMap contributors';
+      g.fillText(attribution, w - g.measureText(attribution).width - 8, h - 6);
+    }
+  }
+
+  // Map tiles are fetched only for the area on screen, as OpenStreetMap's tile policy requires
+  // (no prefetching or offline download); the browser's HTTP cache handles repeat views.
+  const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const TILE_CACHE_MAX = 300;
+  const tiles = new Map();
+  const tilesToggle = $('#mapTilesToggle');
+  if (tilesToggle) {
+    try { tilesToggle.checked = localStorage.getItem('aigc.mapTiles') !== 'off'; } catch { /* storage unavailable */ }
+    tilesToggle.addEventListener('change', () => {
+      try { localStorage.setItem('aigc.mapTiles', tilesToggle.checked ? 'on' : 'off'); } catch { /* storage unavailable */ }
+    });
+  }
+
+  function tileImage(z, x, y) {
+    const key = `${z}/${x}/${y}`;
+    let img = tiles.get(key);
+    if (img) {
+      tiles.delete(key);
+      tiles.set(key, img);
+      return img;
+    }
+    img = new Image();
+    img.src = TILE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+    tiles.set(key, img);
+    if (tiles.size > TILE_CACHE_MAX) tiles.delete(tiles.keys().next().value);
+    return img;
+  }
+
+  function drawTiles(g, w, h, lat, lon, pxPerMeter) {
+    if (tilesToggle && !tilesToggle.checked) return false;
+    const cosLat = Math.cos((lat * Math.PI) / 180);
+    const z = Math.max(3, Math.min(18, Math.floor(Math.log2(156543.03 * cosLat * pxPerMeter))));
+    const n = 2 ** z;
+    const worldX = ((lon + 180) / 360) * 256 * n;
+    const latRad = (lat * Math.PI) / 180;
+    const worldY = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * 256 * n;
+    const k = (pxPerMeter * 156543.03 * cosLat) / n; // canvas px per tile px
+    const size = 256 * k;
+    const x0 = Math.floor((worldX - w / 2 / k) / 256);
+    const x1 = Math.floor((worldX + w / 2 / k) / 256);
+    const y0 = Math.max(0, Math.floor((worldY - h / 2 / k) / 256));
+    const y1 = Math.min(n - 1, Math.floor((worldY + h / 2 / k) / 256));
+    let drawn = false;
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const img = tileImage(z, ((tx % n) + n) % n, ty);
+        if (!img.complete || !img.naturalWidth) continue;
+        const dx = w / 2 + (tx * 256 - worldX) * k;
+        const dy = h / 2 + (ty * 256 - worldY) * k;
+        g.drawImage(img, Math.floor(dx), Math.floor(dy), Math.ceil(size) + 1, Math.ceil(size) + 1);
+        drawn = true;
+      }
+    }
+    if (drawn) {
+      g.fillStyle = 'rgba(11,18,34,0.35)';
+      g.fillRect(0, 0, w, h);
+    }
+    return drawn;
   }
 
   function frame() {

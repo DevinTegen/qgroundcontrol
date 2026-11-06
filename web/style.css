@@ -164,3 +164,4 @@ dialog h2 { margin-top: 0; font-size: 18px; }
 .pad-mapping label { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .sim-note { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; padding: 8px 12px; margin: 4px 0 10px; }
 .bridge-banner { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 14px; margin-top: 16px; }
+.map-toggle { display: block; font-size: 12px; margin: 4px 0 8px; }

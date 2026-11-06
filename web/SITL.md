@@ -22,7 +22,9 @@ tools/aigc/run_sitl.sh tailsitter   # VTOL tailsitter (Lucid style)
 tools/aigc/run_sitl.sh copter       # quad X
 ```
 
-Add `--wipe` to reset all parameters, or `--home LAT,LON,ALT_M,HEADING` to start somewhere else.
+The aircraft starts at Pendleton, Oregon (Eastern Oregon Regional, KPDT), on the east end of runway 25 facing west. Add `--wipe` to reset all parameters, `--home cmac` for ArduPilot's usual field in Australia, or `--home LAT,LON,ALT_M,HEADING` to start anywhere else.
+
+The Fly tab's map shows OpenStreetMap tiles for whatever is on screen as you fly, so the whole Pendleton area fills in as you go. Tiles are not pre-downloaded: OpenStreetMap's tile policy forbids bulk or offline downloads. Untick **Map tiles** to fall back to the plain grid.
 
 Codespaces is billed to your GitHub account. Personal accounts include free monthly hours. Stop the codespace when
 you're done.
