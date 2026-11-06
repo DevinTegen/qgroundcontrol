@@ -84,10 +84,18 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("out_dir")
     ap.add_argument("--min-version", default="4.4")
+    ap.add_argument("--only", help="just one release, e.g. Plane-4.6.3")
     args = ap.parse_args()
     min_v = tuple(map(int, args.min_version.split(".")))
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
+
+    if args.only:
+        vehicle, version = args.only.split("-", 1)
+        docs = convert(fetch(f"{BASE}/{vehicle}/stable-{version}/apm.pdef.xml"))
+        (out / f"{vehicle}-{version}.json").write_text(json.dumps(docs, separators=(",", ":")))
+        print(f"{vehicle} {version}: {sum(len(g) for g in docs.values())} params")
+        return 0
 
     index = {}
     for vehicle in VEHICLES:

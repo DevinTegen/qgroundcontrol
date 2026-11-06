@@ -14,6 +14,8 @@ const COPTER_MODES = { 0: 'STABILIZE', 1: 'ACRO', 2: 'ALT_HOLD', 3: 'AUTO', 4: '
 const ROVER_MODES = { 0: 'MANUAL', 1: 'ACRO', 3: 'STEERING', 4: 'HOLD', 5: 'LOITER', 6: 'FOLLOW', 7: 'SIMPLE', 8: 'DOCK', 9: 'CIRCLE', 10: 'AUTO', 11: 'RTL', 12: 'SMART_RTL', 15: 'GUIDED' };
 
 /// ArduPilot docs set name for a MAV_TYPE.
+export const MODES = { Plane: PLANE_MODES, Copter: COPTER_MODES, Rover: ROVER_MODES };
+
 export function vehicleDocsName(mavType) {
   if ([1, 16, 19, 20, 21, 22, 23, 24, 25].includes(mavType)) return 'Plane';
   if ([2, 3, 4, 13, 14, 15, 29, 35].includes(mavType)) return 'Copter';
@@ -31,7 +33,8 @@ export class Vehicle extends EventTarget {
     this.encoder = new MavlinkEncoder(255, 190);
     this.parser = new MavlinkParser((m) => this._handle(m));
     this.target = null; // {sysid, compid}
-    this.state = { armed: false, mode: '', type: null, docsName: null, version: null, versionType: null, battery: null, rssi: null, statustext: [] };
+    this.state = { armed: false, mode: '', type: null, docsName: null, version: null, versionType: null, battery: null, rssi: null, statustext: [],
+      att: null, hud: null, pos: null, nav: null, home: null };
     this.params = new Map(); // name -> {value, type, def, index}
     this.paramCount = 0;
     this.rc = [];
@@ -143,9 +146,65 @@ export class Vehicle extends EventTarget {
       case 'PARAM_VALUE':
         this._onParamValue(f);
         break;
+      case 'ATTITUDE':
+        this.state.att = { roll: f.roll, pitch: f.pitch, yaw: f.yaw, t: Date.now() };
+        this._emit('att', this.state.att);
+        break;
+      case 'VFR_HUD':
+        this.state.hud = { airspeed: f.airspeed, groundspeed: f.groundspeed, alt: f.alt, climb: f.climb, throttle: f.throttle, heading: f.heading };
+        this._emit('hud', this.state.hud);
+        break;
+      case 'GLOBAL_POSITION_INT':
+        this.state.pos = { lat: f.lat / 1e7, lon: f.lon / 1e7, relAlt: f.relative_alt / 1000, hdg: f.hdg === 65535 ? null : f.hdg / 100 };
+        this._emit('pos', this.state.pos);
+        break;
+      case 'NAV_CONTROLLER_OUTPUT':
+        this.state.nav = { roll: f.nav_roll, pitch: f.nav_pitch, t: Date.now() };
+        this._emit('nav', this.state.nav);
+        break;
+      case 'HOME_POSITION':
+        this.state.home = { lat: f.latitude / 1e7, lon: f.longitude / 1e7 };
+        break;
       default:
         break;
     }
+  }
+
+  /// ArduPilot SITL exposes its simulator parameters (SIM_*).
+  get isSitl() {
+    return this.params.has('SIM_SPEEDUP') || this.params.has('SIM_RATE_HZ');
+  }
+
+  /// Sends a COMMAND_LONG and resolves with the COMMAND_ACK result (0 = accepted), or null on timeout.
+  async commandAck(command, params = [], timeoutMs = 3000) {
+    const ack = this.waitFor((m) => m.name === 'COMMAND_ACK' && m.fields.command === command, timeoutMs);
+    await this.command(command, params);
+    const m = await ack;
+    return m ? m.fields.result : null;
+  }
+
+  /// Telemetry for the Fly tab. Only requested while it is open, to keep slow radio links free.
+  requestFlightStreams(on) {
+    const rates = { 30: 100000, 74: 200000, 33: 200000, 62: 100000, 1: 1000000 };
+    for (const [msgId, us] of Object.entries(rates)) {
+      this.command(MAV_CMD_SET_MESSAGE_INTERVAL, [Number(msgId), on ? us : 0]);
+    }
+    if (on) this.command(MAV_CMD_REQUEST_MESSAGE, [242]); // HOME_POSITION
+  }
+
+  arm(arm) {
+    return this.commandAck(400, [arm ? 1 : 0]);
+  }
+
+  setMode(customMode) {
+    return this.commandAck(176, [1, customMode]);
+  }
+
+  /// RC override, channels 1..n as PWM (0 releases the channel back to the radio).
+  rcOverride(pwm) {
+    const f = { target_system: this.target.sysid, target_component: this.target.compid };
+    for (let i = 0; i < 18; i++) f[`chan${i + 1}_raw`] = pwm[i] || 0;
+    return this.send('RC_CHANNELS_OVERRIDE', f);
   }
 
   get linkAlive() {
@@ -217,8 +276,9 @@ export class Vehicle extends EventTarget {
     view.setUint32(8, offset, true);
     payload.set(data, 12);
     for (let attempt = 0; attempt < 4; attempt++) {
+      // Replies carry seq + 1 of the request (NAKs don't echo the offset).
       const reply = this.waitFor((m) => m.name === 'FILE_TRANSFER_PROTOCOL' && m.fields.payload[5] === opcode &&
-        new DataView(new Uint8Array(m.fields.payload).buffer).getUint32(8, true) === offset, timeoutMs);
+        (m.fields.payload[0] | (m.fields.payload[1] << 8)) === ((seq + 1) & 0xffff), timeoutMs);
       await this.send('FILE_TRANSFER_PROTOCOL', { target_network: 0, target_system: this.target.sysid, target_component: this.target.compid, payload: Array.from(payload) });
       const m = await reply;
       if (m) {
@@ -238,18 +298,23 @@ export class Vehicle extends EventTarget {
       return false;
     }
     const session = open.session;
-    const fileSize = new DataView(open.data.buffer).getUint32(0, true);
+    // The size reported at open is an estimate for generated files like param.pck; read until EOF.
+    const sizeEstimate = new DataView(open.data.buffer).getUint32(0, true);
+    const NAK = 129, ERR_EOF = 6;
     const chunks = [];
     let offset = 0;
-    while (offset < fileSize) {
+    for (;;) {
       const r = await this._ftp(READ, { session, size: 239, offset }, 1500);
+      if (r && r.opcode === NAK && r.data[0] === ERR_EOF) {
+        break;
+      }
       if (!r || r.opcode !== ACK || r.size === 0) {
         await this._ftp(TERMINATE, { session }, 500);
         return false;
       }
       chunks.push(r.data);
       offset += r.size;
-      onProgress(offset, fileSize, 'bytes');
+      onProgress(Math.min(offset, sizeEstimate), Math.max(offset, sizeEstimate), 'bytes');
     }
     await this._ftp(TERMINATE, { session }, 500);
     const file = new Uint8Array(offset);
@@ -263,7 +328,7 @@ export class Vehicle extends EventTarget {
 
   /// Writes a parameter and resolves with the value the vehicle confirms. Refused while armed.
   async setParam(name, value) {
-    if (this.state.armed) {
+    if (this.state.armed && !this.isSitl) {
       throw new Error('Vehicle is armed');
     }
     const p = this.params.get(name);

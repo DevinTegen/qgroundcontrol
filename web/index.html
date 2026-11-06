@@ -34,6 +34,9 @@
         <button class="choice" data-link="direct" role="radio" aria-checked="false">
           <b>USB to flight controller</b><small>Bench setup, no radio</small>
         </button>
+        <button class="choice" data-link="sitl" role="radio" aria-checked="false">
+          <b>Simulator (SITL)</b><small>Real ArduPilot code, simulated aircraft</small>
+        </button>
       </div>
     </section>
 
@@ -57,6 +60,7 @@
   <main id="appView" class="app" hidden>
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="params" aria-selected="true">Parameters</button>
+      <button role="tab" data-tab="fly">Fly</button>
       <button role="tab" data-tab="rc">RC Mapping</button>
       <button role="tab" data-tab="claude">Ask Claude</button>
       <button role="tab" data-tab="messages">Messages</button>
@@ -86,6 +90,36 @@
           <div id="paramEmpty" class="empty" hidden></div>
         </div>
         <aside id="paramDetails" class="details"><p class="muted">Select a parameter to see its full documentation. Click a value to change it.</p></aside>
+      </div>
+    </section>
+
+    <!-- Fly -->
+    <section id="tab-fly" class="tab" hidden>
+      <p id="flySimNote" class="sim-note" hidden>Simulator: parameter changes can be written while flying. Change a gain on the Parameters tab and watch the tuning graph.</p>
+      <div class="fly-grid">
+        <div class="fly-col">
+          <canvas id="hud" width="560" height="320" aria-label="Attitude indicator"></canvas>
+          <canvas id="tuneGraph" width="560" height="240" aria-label="Roll and pitch tuning graph"></canvas>
+        </div>
+        <div class="fly-col">
+          <canvas id="trackMap" width="420" height="320" aria-label="Track map"></canvas>
+          <div class="card">
+            <div class="row"><button id="armBtn" class="btn btn-primary">Arm</button><span id="flyStatus" class="muted"></span></div>
+            <div id="modeButtons" class="mode-buttons"></div>
+          </div>
+          <div id="sticksCard" class="card" hidden>
+            <h2>Sticks (simulator only)</h2>
+            <label>Fly with <select id="stickSource">
+              <option value="off">Off: use the simulator's RC</option>
+              <option value="gamepad">USB joystick / radio (TX15 in USB Joystick mode)</option>
+              <option value="keyboard">Keyboard</option>
+            </select></label>
+            <div id="padMapping" class="pad-mapping" hidden></div>
+            <p id="padAxes" class="muted small"></p>
+            <p id="keyHelp" class="muted small" hidden>Arrows: roll and pitch · A/D: yaw · W/S: throttle up/down (stays where you leave it)</p>
+            <p id="stickReadout" class="muted small"></p>
+          </div>
+        </div>
       </div>
     </section>
 

@@ -1,0 +1,14 @@
+{
+  "name": "AIGC SITL (ArduPilot simulator + AIGC Web)",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+  "hostRequirements": { "cpus": 4 },
+  "postCreateCommand": "sudo apt-get update -q && sudo apt-get install -y -q g++ make rsync && tools/aigc/run_sitl.sh plane --build-only && tools/aigc/run_sitl.sh copter --build-only",
+  "postAttachCommand": "tools/aigc/run_sitl.sh ${localEnv:AIGC_VEHICLE:plane}",
+  "forwardPorts": [5761],
+  "portsAttributes": {
+    "5761": { "label": "AIGC Web + SITL", "onAutoForward": "openBrowser" }
+  },
+  "customizations": {
+    "codespaces": { "openFiles": ["web/SITL.md"] }
+  }
+}

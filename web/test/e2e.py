@@ -13,7 +13,8 @@ with sync_playwright() as p:
     page = browser.new_page(viewport={"width": 1400, "height": 900})
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
-    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+    # The bridge probe (aigc-bridge.json) is expected to 404 on a plain web server.
+    page.on("console", lambda m: m.type == "error" and "status of 404" not in m.text and errors.append(m.text))
     page.goto(BASE)
     page.screenshot(path=f"{SHOTS}/01-connect.png")
 

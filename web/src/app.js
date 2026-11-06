@@ -2,6 +2,7 @@ import { WebSerialTransport, WebSocketTransport, webSerialSupported } from './tr
 import { Vehicle } from './vehicle.js';
 import { loadParamDocs, optionsText, valueLabel } from './docs.js';
 import { MAV_PARAM_TYPE } from './mavlink.js';
+import { initFly } from './fly.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -38,6 +39,16 @@ const LINKS = {
       `More: <a href="${ELRS_GUIDE}" target="_blank" rel="noopener">ELRS MAVLink guide</a>`,
     ],
   },
+  sitl: {
+    transports: {
+      wifi: { label: 'Simulator bridge', hint: 'AIGC bridge in front of ArduPilot SITL (local or Codespace)', url: 'ws://127.0.0.1:5761/mavlink' },
+    },
+    checklist: [
+      'Start the simulator with <code>tools/aigc/run_sitl.sh plane</code> (or <code>copter</code>), or open the AIGC SITL Codespace. See the README.',
+      'When the page is opened from the simulator\'s own address, the connection is filled in for you.',
+      'Fly from the Fly tab with your TX15 in USB Joystick mode, or the keyboard. Parameter changes can be written while flying in the simulator.',
+    ],
+  },
   direct: {
     transports: {
       usb: { label: 'USB cable', hint: 'Straight into the flight controller', baud: 115200, bauds: [57600, 115200, 230400, 460800, 921600] },
@@ -57,6 +68,23 @@ const saveSettings = () => { try { localStorage.setItem('aigc.connect', JSON.str
 settings.link ||= 'mlrs';
 settings.transport ||= 'usb';
 
+/// When this page is served by an AIGC bridge (simulator, Codespace or radio module), connect back to it.
+const sameOriginBridgeUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/mavlink`;
+let bridgeInfo = null;
+fetch('aigc-bridge.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((info) => {
+  if (!info) return;
+  bridgeInfo = info;
+  const link = info.sitl ? 'sitl' : (info.link || settings.link);
+  settings.link = link;
+  settings.transport = 'wifi';
+  settings[`url.${link}`] = sameOriginBridgeUrl;
+  const banner = document.createElement('div');
+  banner.className = 'bridge-banner';
+  banner.innerHTML = `<b>${info.sitl ? 'Simulator ready' : 'Connected to the module'}</b>: this page is served by the AIGC bridge (${esc(info.upstream || '')}). Press Connect.`;
+  $('#connectView .lead').after(banner);
+  renderConnect();
+}).catch(() => { /* not served by a bridge */ });
+
 // ------------------------------------------------------------------ app state
 
 let vehicle = null;
@@ -75,7 +103,7 @@ function renderConnect() {
     b.setAttribute('aria-checked', String(b.dataset.link === settings.link));
   }
   const link = LINKS[settings.link];
-  if (!link.transports[settings.transport]) settings.transport = 'usb';
+  if (!link.transports[settings.transport]) settings.transport = Object.keys(link.transports)[0];
 
   $('#transportChoices').innerHTML = Object.entries(link.transports).map(([key, t]) => {
     const disabled = key === 'usb' && !webSerialSupported();
@@ -95,7 +123,7 @@ function renderConnect() {
     const url = settings[`url.${settings.link}`] || t.url;
     opts = `<label>Bridge address<input id="wsUrl" size="34" value="${esc(url)}"></label>
       <span class="note">Join the module's Wi-Fi first. Needs the AIGC bridge firmware on the module's Wi-Fi chip (in development).</span>
-      ${location.protocol === 'https:' ? '<span class="note">This copy of the app is loaded over https, and browsers block unencrypted Wi-Fi links from https pages. Use the copy served by the module itself (the popup when you join its Wi-Fi), or USB.</span>' : ''}`;
+      ${location.protocol === 'https:' && !location.hostname.endsWith('.app.github.dev') && !bridgeInfo ? '<span class="note">This copy of the app is loaded over https, and browsers block unencrypted Wi-Fi links from https pages. Use the copy served by the module itself (the popup when you join its Wi-Fi), or USB.</span>' : ''}`;
   }
   $('#transportOptions').innerHTML = opts;
   $('#checklist').innerHTML = link.checklist.map((c) => `<li>${c}</li>`).join('');
@@ -161,7 +189,7 @@ async function connect() {
   $('#connectView').hidden = true;
   $('#appView').hidden = false;
   $('#disconnectBtn').hidden = false;
-  setPill(`${settings.link === 'direct' ? 'USB' : settings.link.toUpperCase()} · ${transport.label}`, 'on');
+  setPill(`${{ direct: 'USB', sitl: 'SITL', mlrs: 'mLRS', elrs: 'ELRS' }[settings.link]} · ${transport.label}`, 'on');
   await loadEverything();
 }
 
@@ -181,7 +209,10 @@ async function disconnect(why) {
   if (why && why !== 'Disconnected') $('#connectError').textContent = why;
 }
 
+const fly = initFly({ getVehicle: () => vehicle, onStatus: (text) => { $('#flyStatus').textContent = text; } });
+
 function wireVehicle(v) {
+  fly.attach(v);
   v.addEventListener('state', renderSummary);
   v.addEventListener('param', (e) => updateParamRow(e.detail.name));
   v.addEventListener('rc', onRc);
@@ -452,7 +483,7 @@ function rangeProblem(d, value) {
 
 function openReview() {
   const list = $('#reviewList');
-  const armed = vehicle?.state.armed;
+  const armed = vehicle?.state.armed && !vehicle?.isSitl;
   $('#armedWarning').hidden = !armed;
   $('#writeBtn').disabled = armed;
   list.innerHTML = [...pending.entries()].map(([name, ch]) => {
@@ -729,6 +760,7 @@ document.querySelector('.tabs').addEventListener('click', (e) => {
   if (!b) return;
   for (const x of document.querySelectorAll('.tabs button')) x.setAttribute('aria-selected', String(x === b));
   for (const s of document.querySelectorAll('.tab')) s.hidden = s.id !== `tab-${b.dataset.tab}`;
+  fly.show(b.dataset.tab === 'fly');
   if (b.dataset.tab === 'rc') renderRcMapping();
   if (b.dataset.tab === 'messages') renderMessages();
 });

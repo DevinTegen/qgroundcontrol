@@ -23,6 +23,10 @@ its own, and no account to sign up for.
 USB, pick **mLRS** or **ELRS**, and get the same firmware-matched parameter docs, Modified list and RC Mapping. See
 [web/README.md](web/README.md).
 
+**Test-fly before you fly:** the simulator runs real ArduPilot (plane, flying wing, quadplane, tailsitter or quad) in a
+GitHub Codespace or on your computer. Change parameters and watch the effect on a live tuning graph while flying with
+your radio as a USB joystick. See [web/SITL.md](web/SITL.md).
+
 ## Contents
 
 - [What's different from QGroundControl](#whats-different-from-qgroundcontrol)
