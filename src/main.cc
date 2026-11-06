@@ -3,6 +3,7 @@
 #include "LogManager.h"
 #include "QGCLoggingCategory.h"
 #include "Platform.h"
+#include "QGCMcpStdioBridge.h"
 
 #ifdef QGC_UNITTEST_BUILD
     #include "UnitTestList.h"
@@ -12,6 +13,11 @@ QGC_LOGGING_CATEGORY_ON(MainLog, "Main")
 
 int main(int argc, char *argv[])
 {
+    // Relay mode for desktop AI apps: no GUI, no QGC initialization.
+    if (QGCMcpStdioBridge::requested(argc, argv)) {
+        return QGCMcpStdioBridge::run(argc, argv);
+    }
+
     // --- Parse command line arguments ---
     const auto args = QGCCommandLineParser::parse(argc, argv);
     if (const auto exitCode = QGCCommandLineParser::handleParseResult(args)) {

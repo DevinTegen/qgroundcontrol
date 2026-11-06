@@ -78,6 +78,11 @@ Item {
         }
         QGCMenuSeparator { }
         QGCMenuItem {
+            text:           qsTr("Connect Claude…")
+            onTriggered:    mcpConnectDialogFactory.open()
+        }
+        QGCMenuSeparator { }
+        QGCMenuItem {
             text:           qsTr("Clear all favorites")
             onTriggered:    controller.clearAllFavorites()
         }
@@ -129,6 +134,16 @@ Item {
             fact:           _editorDialogFact
             showRCToParam:  _showRCToParam
         }
+    }
+
+    QGCPopupDialogFactory {
+        id:                 mcpConnectDialogFactory
+        dialogComponent:    mcpConnectDialogComponent
+    }
+
+    Component {
+        id: mcpConnectDialogComponent
+        McpConnectDialog { }
     }
 
     QGCPopupDialogFactory {

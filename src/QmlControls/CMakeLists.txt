@@ -138,6 +138,8 @@ qt_add_qml_module(
         LabelledComboBox.qml
         LabelledLabel.qml
         LogReplayStatusBar.qml
+        McpConnectDialog.qml
+        McpProposalDialog.qml
         MissionCommandDialog.qml
         MvPanelPage.qml
         OfflineMapButton.qml

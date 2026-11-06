@@ -136,6 +136,7 @@ class ParameterEditorController : public FactPanelController
 {
     Q_OBJECT
     QML_ELEMENT
+    Q_MOC_INCLUDE("Fact.h")
     Q_PROPERTY(QString              searchText              MEMBER _searchText                                          NOTIFY searchTextChanged)
     Q_PROPERTY(QmlObjectListModel*  categories              READ categories                                             CONSTANT)
     Q_PROPERTY(QObject*             currentCategory         READ currentCategory            WRITE setCurrentCategory    NOTIFY currentCategoryChanged)

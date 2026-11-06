@@ -6,6 +6,7 @@
 #include "FirmwarePluginManager.h"
 #include "FlightMapSettings.h"
 #include "GPSManager.h"
+#include "QGCMcpServer.h"
 #include "LinkManager.h"
 #include "LoggingCategoryModel.h"
 #include "MAVLinkProtocol.h"
@@ -93,6 +94,11 @@ QGroundControlQmlGlobal::~QGroundControlQmlGlobal()
 GPSManager* QGroundControlQmlGlobal::gpsManager() const
 {
     return GPSManager::instance();
+}
+
+QGCMcpServer* QGroundControlQmlGlobal::mcpServer() const
+{
+    return QGCMcpServer::instance();
 }
 
 PositionManager* QGroundControlQmlGlobal::positionManager() const

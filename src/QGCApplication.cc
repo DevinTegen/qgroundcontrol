@@ -19,6 +19,7 @@
 #include "ColoredSvgImageProvider.h"
 #include "FollowMe.h"
 #include "GPSManager.h"
+#include "QGCMcpServer.h"
 #include "GraphicsSetup.h"
 #include "JoystickManager.h"
 #include "JsonParsing.h"
@@ -300,6 +301,7 @@ void QGCApplication::_initForNormalAppBoot()
     FollowMe::instance()->init();
     LinkManager::instance()->init();
     GPSManager::instance()->init();
+    QGCMcpServer::instance()->init();
     VideoManager::instance()->init(mainRootWindow());
 
     // Set the window icon now that custom plugin has a chance to override it

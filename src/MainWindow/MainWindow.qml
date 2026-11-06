@@ -192,6 +192,25 @@ ApplicationWindow {
         _showMessageDialogWorker(mainWindow, dialogTitle, dialogText)
     }
 
+    // Parameter changes proposed by Claude over MCP are always reviewed by the user before being written.
+    QGCPopupDialogFactory {
+        id:                 mcpProposalDialogFactory
+        dialogComponent:    mcpProposalDialogComponent
+    }
+
+    Component {
+        id: mcpProposalDialogComponent
+        McpProposalDialog { }
+    }
+
+    Connections {
+        target: QGroundControl.mcpServer
+
+        function onProposalAdded(proposal) {
+            mcpProposalDialogFactory.open({ proposal: proposal })
+        }
+    }
+
     Connections {
         target: QGroundControl
 
