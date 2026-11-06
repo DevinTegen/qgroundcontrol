@@ -1,0 +1,70 @@
+name: AIGC Web
+
+on:
+  push:
+    branches:
+      - master
+      - 'feat/**'
+    paths:
+      - 'web/**'
+      - 'tools/aigc/**'
+      - 'resources/aigc/**'
+      - '.github/workflows/aigc-web.yml'
+  schedule:
+    - cron: '17 9 * * 1' # weekly: pick up new ArduPilot releases' parameter docs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: aigc-web-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test tools
+        run: |
+          pip install pymavlink websockets playwright
+          node --check web/src/app.js
+
+      - name: End-to-end test against simulated ArduPlane
+        run: |
+          python -m playwright install --with-deps chromium
+          python tools/aigc/build_param_docs.py web/docs --min-version 4.6 || true
+          cd web
+          python -m http.server 8080 --bind 127.0.0.1 &
+          python test/sim_vehicle.py --port 8765 &
+          sleep 2
+          sed -i 's/channel="chrome", //' test/e2e.py
+          python test/e2e.py http://127.0.0.1:8080/ ws://127.0.0.1:8765 /tmp
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r web/index.html web/style.css web/src web/assets _site/
+          python tools/aigc/build_param_docs.py _site/docs --min-version 4.4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

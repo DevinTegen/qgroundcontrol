@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 256" width="920" height="256">
+  <defs>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <g>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#16213A"/>
+      <stop offset="1" stop-color="#070B16"/>
+    </radialGradient>
+    <linearGradient id="wing" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <radialGradient id="sweep" cx="128" cy="128" r="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+
+  <!-- radar sweep -->
+  <path d="M128 128 L128 28 A100 100 0 0 1 214.6 78 Z" fill="url(#sweep)"/>
+  <!-- range rings -->
+  <circle cx="128" cy="128" r="66" fill="none" stroke="#22D3EE" stroke-opacity="0.18" stroke-width="1.5"/>
+  <circle cx="128" cy="128" r="100" fill="none" stroke="url(#ring)" stroke-width="5"/>
+  <!-- compass ticks -->
+  <g stroke="#9FE7F5" stroke-opacity="0.7" stroke-width="3" stroke-linecap="round">
+    <line x1="128" y1="20" x2="128" y2="34"/>
+    <line x1="236" y1="128" x2="222" y2="128"/>
+    <line x1="128" y1="236" x2="128" y2="222"/>
+    <line x1="20" y1="128" x2="34" y2="128"/>
+  </g>
+
+  <!-- flying wing -->
+  <path d="M128 60 L206 166 L198 176 L128 148 L58 176 L50 166 Z" fill="url(#wing)" filter="url(#glow)"/>
+
+  <!-- neural traces on the wing -->
+  <g stroke="#ECFEFF" stroke-opacity="0.85" stroke-width="2.2" stroke-linecap="round">
+    <line x1="128" y1="92" x2="128" y2="138"/>
+    <line x1="128" y1="108" x2="104" y2="132"/>
+    <line x1="128" y1="108" x2="152" y2="132"/>
+    <line x1="104" y1="132" x2="80" y2="156"/>
+    <line x1="152" y1="132" x2="176" y2="156"/>
+    <line x1="104" y1="132" x2="128" y2="138"/>
+    <line x1="152" y1="132" x2="128" y2="138"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="128" cy="92" r="5"/>
+    <circle cx="128" cy="108" r="4"/>
+    <circle cx="104" cy="132" r="4.5"/>
+    <circle cx="152" cy="132" r="4.5"/>
+    <circle cx="128" cy="138" r="4"/>
+    <circle cx="80" cy="156" r="4"/>
+    <circle cx="176" cy="156" r="4"/>
+  </g>
+
+  <!-- nav lights -->
+  <circle cx="54" cy="170" r="5" fill="#EF4444" filter="url(#glow)"/>
+  <circle cx="202" cy="170" r="5" fill="#22C55E" filter="url(#glow)"/>
+</g>
+  <text x="292" y="150" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="128" font-weight="800" textLength="360" lengthAdjust="spacingAndGlyphs" fill="url(#word)">AIGC</text>
+  <text x="298" y="200" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="500" textLength="590" lengthAdjust="spacingAndGlyphs" fill="#8A9BB8">ARTIFICIAL INTELLIGENCE GROUND CONTROL</text>
+</svg>

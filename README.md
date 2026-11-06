@@ -19,6 +19,10 @@ its own, and no account to sign up for.
 > AIGC is an independent community project. It is not made, endorsed or supported by Anthropic or the QGroundControl
 > project. "Claude" is a trademark of Anthropic.
 
+**No install?** Try **[AIGC Web](https://devintegen.github.io/qgroundcontrol/)** in Chrome or Edge: connect over
+USB, pick **mLRS** or **ELRS**, and get the same firmware-matched parameter docs, Modified list and RC Mapping. See
+[web/README.md](web/README.md).
+
 ## Contents
 
 - [What's different from QGroundControl](#whats-different-from-qgroundcontrol)

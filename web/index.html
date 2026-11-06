@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AIGC Web — Artificial Intelligence Ground Control</title>
+  <link rel="icon" href="assets/aigc-icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <img src="assets/aigc-icon.svg" alt="" class="topbar-icon">
+    <div class="brand"><b>AIGC</b><span>Web</span></div>
+    <div id="vehicleSummary" class="vehicle-summary" aria-live="polite"></div>
+    <div class="spacer"></div>
+    <span id="linkPill" class="pill pill-off">Not connected</span>
+    <button id="disconnectBtn" class="btn btn-ghost" hidden>Disconnect</button>
+  </header>
+
+  <!-- ============================== Connect ============================== -->
+  <main id="connectView" class="connect">
+    <img src="assets/aigc-logo.svg" alt="AIGC — Artificial Intelligence Ground Control" class="connect-logo">
+    <p class="lead">Ground control for ArduPilot in your browser. Nothing to install.</p>
+
+    <section class="card">
+      <h2><span class="step">1</span> Which radio link are you using?</h2>
+      <div class="choice-row" id="linkChoices" role="radiogroup" aria-label="Radio link">
+        <button class="choice" data-link="mlrs" role="radio" aria-checked="true">
+          <b>mLRS</b><small>MAVLink-native LoRa link — recommended</small>
+        </button>
+        <button class="choice" data-link="elrs" role="radio" aria-checked="false">
+          <b>ELRS</b><small>ExpressLRS in MAVLink mode (3.5+)</small>
+        </button>
+        <button class="choice" data-link="direct" role="radio" aria-checked="false">
+          <b>USB to flight controller</b><small>Bench setup, no radio</small>
+        </button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">2</span> How is it connected to this computer?</h2>
+      <div class="choice-row" id="transportChoices" role="radiogroup" aria-label="Connection"></div>
+      <div id="transportOptions" class="options"></div>
+      <div class="connect-actions">
+        <button id="connectBtn" class="btn btn-primary">Connect</button>
+        <span id="connectError" class="error" role="alert"></span>
+      </div>
+    </section>
+
+    <section class="card checklist">
+      <h2>Before you connect</h2>
+      <ul id="checklist"></ul>
+    </section>
+  </main>
+
+  <!-- ============================== App ============================== -->
+  <main id="appView" class="app" hidden>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="params" aria-selected="true">Parameters</button>
+      <button role="tab" data-tab="rc">RC Mapping</button>
+      <button role="tab" data-tab="claude">Ask Claude</button>
+      <button role="tab" data-tab="messages">Messages</button>
+    </nav>
+
+    <div id="progress" class="progress" hidden><div class="progress-bar"></div><span></span></div>
+    <div id="docsLine" class="docs-line"></div>
+
+    <!-- Parameters -->
+    <section id="tab-params" class="tab">
+      <div class="toolbar">
+        <input id="paramSearch" type="search" placeholder="Search names and descriptions (e.g. PTCH2SRV, airspeed)" aria-label="Search parameters">
+        <div class="seg" role="radiogroup" aria-label="Filter">
+          <button data-filter="all" aria-checked="true">All</button>
+          <button data-filter="modified" aria-checked="false">Modified <span id="modifiedCount"></span></button>
+          <button data-filter="undocumented" aria-checked="false">Undocumented <span id="undocCount"></span></button>
+        </div>
+        <button id="refreshParams" class="btn btn-ghost">Refresh</button>
+        <button id="saveParams" class="btn btn-ghost">Save to file</button>
+      </div>
+      <div class="split">
+        <div class="table-wrap">
+          <table class="params">
+            <thead><tr><th>Name</th><th>Value</th><th>Default</th><th>Units</th><th>Options</th><th>Description</th></tr></thead>
+            <tbody id="paramRows"></tbody>
+          </table>
+          <div id="paramEmpty" class="empty" hidden></div>
+        </div>
+        <aside id="paramDetails" class="details"><p class="muted">Select a parameter to see its full documentation. Click a value to change it.</p></aside>
+      </div>
+    </section>
+
+    <!-- RC Mapping -->
+    <section id="tab-rc" class="tab" hidden>
+      <p class="muted">Move a stick or flip a switch: its channel lights up. Assign it to an axis or the flight-mode switch, or give it an RC option. Stick mapping changes take effect after a reboot.</p>
+      <div id="lastMoved" class="last-moved" hidden></div>
+      <table class="rc">
+        <thead><tr><th>Ch</th><th>Live</th><th>PWM</th><th>Function</th><th>Assign</th><th>RC option</th><th>Rev</th><th></th></tr></thead>
+        <tbody id="rcRows"></tbody>
+      </table>
+    </section>
+
+    <!-- Ask Claude -->
+    <section id="tab-claude" class="tab" hidden>
+      <div class="claude-grid">
+        <div class="card">
+          <h2>1. Give Claude your setup</h2>
+          <p>Copies your firmware, version, which parameter docs are loaded, and every modified parameter with its documentation. Paste it into a chat at <a href="https://claude.ai/new" target="_blank" rel="noopener">claude.ai</a> (your own account), then say what you want the aircraft to do.</p>
+          <label class="inline"><input id="ctxIncludeAll" type="checkbox"> Include all parameters (long)</label>
+          <div class="row"><button id="copyContext" class="btn btn-primary">Copy setup for Claude</button><span id="copyStatus" class="muted"></span></div>
+          <p class="muted small">Using Claude in Chrome? It can read this page directly. Ask it to look at the Parameters tab.</p>
+        </div>
+        <div class="card">
+          <h2>2. Paste Claude's suggestions</h2>
+          <p>Lines like <code>PTCH2SRV_P = 0.8  # reduce porpoising</code>. You'll review every change before anything is written.</p>
+          <textarea id="suggestions" rows="9" placeholder="NAME = value  # reason"></textarea>
+          <div class="row"><button id="reviewSuggestions" class="btn btn-primary">Review changes</button><span id="suggestStatus" class="muted"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Messages -->
+    <section id="tab-messages" class="tab" hidden>
+      <ul id="messageList" class="messages"></ul>
+    </section>
+  </main>
+
+  <!-- Pending changes bar -->
+  <div id="pendingBar" class="pending-bar" hidden>
+    <span id="pendingText"></span>
+    <button id="pendingDiscard" class="btn btn-ghost">Discard</button>
+    <button id="pendingReview" class="btn btn-primary">Review &amp; write</button>
+  </div>
+
+  <!-- Review dialog -->
+  <dialog id="reviewDialog">
+    <form method="dialog">
+      <h2>Review parameter changes</h2>
+      <p class="muted">Nothing is written until you click Write. Uncheck anything you don't want.</p>
+      <p id="armedWarning" class="error" hidden>The vehicle is armed. Disarm it to write parameters.</p>
+      <div id="reviewList" class="review-list"></div>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn btn-ghost">Cancel</button>
+        <button id="writeBtn" value="write" class="btn btn-primary">Write to vehicle</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Edit dialog -->
+  <dialog id="editDialog">
+    <form method="dialog">
+      <h2 id="editTitle"></h2>
+      <p id="editDesc" class="muted"></p>
+      <div id="editControl"></div>
+      <p id="editError" class="error"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn btn-ghost">Cancel</button>
+        <button id="editOk" value="ok" class="btn btn-primary">Add to pending changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
