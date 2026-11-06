@@ -331,6 +331,9 @@ public:
     /// Return the resource file which contains the set of params loaded for offline editing.
     virtual QString offlineEditingParamFile(Vehicle* /*vehicle*/) const { return QString(); }
 
+    /// User facing description of which parameter documentation set is loaded (version, exact or nearest match)
+    virtual QString parameterMetaDataDescription(const QString &metaDataFile) const { return metaDataFile; }
+
     /// Return the resource file which contains the vehicle icon used in the flight view when the view is dark (Satellite for instance)
     virtual QString vehicleImageOpaque(const Vehicle* /*vehicle*/) const { return QStringLiteral("/qmlimages/vehicleArrowOpaque.svg"); }
 
@@ -426,6 +429,8 @@ protected:
     bool _setFlightModeAndValidate(Vehicle *vehicle, const QString &flightMode) const;
 
     virtual QString _internalParameterMetaDataFile(const Vehicle* /*vehicle*/) const { return QString(); }
+    /// Metadata that exactly matches the vehicle's firmware version, preferred over bundled/cached files when present
+    virtual QString _exactParameterMetaDataFile(const Vehicle* /*vehicle*/) const { return QString(); }
     virtual MAV_AUTOPILOT _autopilotType() const { return MAV_AUTOPILOT_GENERIC; }
     virtual ParameterMetaData *_createParameterMetaData() { return nullptr; }
     QString _cachedParameterMetaDataFile(const Vehicle *vehicle) const;

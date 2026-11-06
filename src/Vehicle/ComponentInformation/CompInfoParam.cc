@@ -2,6 +2,7 @@
 #include "FirmwarePlugin.h"
 #include "JsonParsing.h"
 #include "JsonSchemaValidator.h"
+#include "ParameterManager.h"
 #include "ParameterMetaData.h"
 #include "QGCLoggingCategory.h"
 #include "Vehicle.h"
@@ -160,4 +161,43 @@ ParameterMetaData *CompInfoParam::_getParameterMetaData()
     }
 
     return _parameterMetaData;
+}
+
+QString CompInfoParam::firmwareMetaDataFile()
+{
+    if (!_noJsonMetadata) {
+        return QString();
+    }
+    ParameterMetaData *metaData = _getParameterMetaData();
+    return metaData ? metaData->sourceFile() : QString();
+}
+
+void CompInfoParam::reloadFirmwareMetaData()
+{
+    if (!_noJsonMetadata || compId != MAV_COMP_ID_AUTOPILOT1) {
+        return;
+    }
+
+    ParameterMetaData *oldMetaData = _parameterMetaData;
+    _parameterMetaData = nullptr;
+    _nameToMetaDataMap.clear();
+
+    ParameterManager *paramMgr = vehicle->parameterManager();
+    if (paramMgr) {
+        for (const QString &name : paramMgr->parameterNames(compId)) {
+            Fact *fact = paramMgr->getParameter(compId, name);
+            FactMetaData *oldFactMetaData = fact->metaData();
+            FactMetaData *newFactMetaData = factMetaDataForName(name, fact->type());
+            // Defaults come from the vehicle's param.pck, not from the docs; carry them over.
+            if (oldFactMetaData && oldFactMetaData->defaultValueAvailable() && !newFactMetaData->defaultValueAvailable()) {
+                newFactMetaData->setRawDefaultValueFirmwareForce(oldFactMetaData->rawDefaultValue());
+            }
+            fact->setMetaData(newFactMetaData);
+        }
+    }
+
+    if (oldMetaData) {
+        oldMetaData->deleteLater();
+    }
+    emit firmwareMetaDataReloaded();
 }

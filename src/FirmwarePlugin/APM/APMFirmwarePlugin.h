@@ -55,6 +55,8 @@ public:
     bool sendHomePositionToVehicle() const override { return true; }
     QString missionCommandOverrides(QGCMAVLink::VehicleClass_t vehicleClass) const override;
     QString _internalParameterMetaDataFile(const Vehicle* vehicle) const override;
+    QString _exactParameterMetaDataFile(const Vehicle* vehicle) const override;
+    QString parameterMetaDataDescription(const QString &metaDataFile) const override;
     MAV_AUTOPILOT _autopilotType() const override { return MAV_AUTOPILOT_ARDUPILOTMEGA; }
     ParameterMetaData *_createParameterMetaData() override;
     QString getHobbsMeter(Vehicle *vehicle) const override;
@@ -108,6 +110,7 @@ private:
     QString _getLatestVersionFileUrl(Vehicle *vehicle) const final;
     QString _versionRegex() const final { return QStringLiteral(" V([0-9,\\.]*)$"); }
     QString _vehicleClassToString(QGCMAVLink::VehicleClass_t vehicleClass) const;
+    void _startExactParamDocsFetch(Vehicle *vehicle);
 
     static void _setBaroGndTemp(Vehicle *vehicle, qreal temperature);
     static void _setBaroAltOffset(Vehicle *vehicle, qreal offset);

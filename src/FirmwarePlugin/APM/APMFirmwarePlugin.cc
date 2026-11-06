@@ -5,6 +5,9 @@
 #include <QtNetwork/QTcpSocket>
 
 #include "APMAutoPilotPlugin.h"
+#include "APMExactParamDocs.h"
+#include "CompInfoParam.h"
+#include "ComponentInformationManager.h"
 #include "APMMavlinkStreamRateSettings.h"
 #include "APMParameterMetaData.h"
 #include "APMVehicleReadiness.h"
@@ -518,6 +521,7 @@ void APMFirmwarePlugin::initializeVehicle(Vehicle *vehicle)
         }
     } else {
         initializeStreamRates(vehicle);
+        _startExactParamDocsFetch(vehicle);
     }
 
     if (SettingsManager::instance()->videoSettings()->videoSource()->rawValue() == VideoSettings::videoSource3DRSolo) {
@@ -703,6 +707,49 @@ QString APMFirmwarePlugin::_vehicleClassToString(QGCMAVLink::VehicleClass_t vehi
     default:
         qCWarning(APMFirmwarePluginLog) << Q_FUNC_INFO << "called with bad VehicleClass_t:" << vehicleClass;
         return QString();
+    }
+}
+
+QString APMFirmwarePlugin::_exactParameterMetaDataFile(const Vehicle *vehicle) const
+{
+    if (!APMExactParamDocs::versionHasPublishedDocs(vehicle)) {
+        return QString();
+    }
+    const QString vehicleName = _vehicleClassToString(QGCMAVLink::vehicleClass(vehicle->vehicleType()));
+    const QVersionNumber version(vehicle->firmwareMajorVersion(), vehicle->firmwareMinorVersion(), vehicle->firmwarePatchVersion());
+    return APMExactParamDocs::cachedFile(vehicleName, version);
+}
+
+QString APMFirmwarePlugin::parameterMetaDataDescription(const QString &metaDataFile) const
+{
+    return APMExactParamDocs::describeMetaDataFile(metaDataFile);
+}
+
+void APMFirmwarePlugin::_startExactParamDocsFetch(Vehicle *vehicle)
+{
+    // The firmware version arrives with AUTOPILOT_VERSION, usually before parameters finish loading.
+    auto fetch = [this, vehicle]() {
+        const QString vehicleName = _vehicleClassToString(QGCMAVLink::vehicleClass(vehicle->vehicleType()));
+        if (vehicleName.isEmpty() || !APMExactParamDocs::versionHasPublishedDocs(vehicle)) {
+            return;
+        }
+        auto *docs = new APMExactParamDocs(vehicle, vehicleName, vehicle);
+        (void) connect(docs, &APMExactParamDocs::docsReady, vehicle, [vehicle, docs]() {
+            // Re-resolve metadata for already-loaded parameters so the exact docs apply this session.
+            if (ComponentInformationManager *compInfo = vehicle->compInfoManager()) {
+                if (CompInfoParam *param = compInfo->compInfoParam(MAV_COMP_ID_AUTOPILOT1)) {
+                    param->reloadFirmwareMetaData();
+                }
+            }
+            docs->deleteLater();
+        });
+        docs->fetchIfNeeded();
+    };
+
+    if (vehicle->firmwareMajorVersion() != Vehicle::versionNotSetValue) {
+        fetch();
+    } else {
+        (void) connect(vehicle, &Vehicle::firmwareVersionChanged, vehicle, fetch, Qt::SingleShotConnection);
     }
 }
 

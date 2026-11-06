@@ -49,6 +49,7 @@ void ParameterMetaData::loadParameterFactMetaDataFile(const QString &metaDataFil
     }
 
     _parameterMetaDataLoaded = true;
+    _sourceFile = metaDataFile;
     parseParameterJson(doc.object());
 }
 

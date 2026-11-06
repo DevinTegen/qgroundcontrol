@@ -17,6 +17,8 @@ public:
 
     void loadParameterFactMetaDataFile(const QString &metaDataFile);
     FactMetaData *getMetaDataForFact(const QString &name, FactMetaData::ValueType_t type);
+    /// File the metadata was loaded from (empty until loaded)
+    QString sourceFile() const { return _sourceFile; }
 
     static QVersionNumber versionFromMetaDataFile(const QString &metaDataFile);
     static QVersionNumber versionFromJsonData(const QByteArray &jsonData);
@@ -45,4 +47,5 @@ protected:
 
     FactMetaData::NameToMetaDataMap_t _cachedMetaData;
     bool _parameterMetaDataLoaded = false;
+    QString _sourceFile;
 };

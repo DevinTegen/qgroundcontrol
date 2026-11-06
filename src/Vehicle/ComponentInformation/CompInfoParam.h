@@ -20,6 +20,15 @@ public:
 
     void setJson(const QString &metadataJsonFileName) override;
 
+    /// Reloads firmware-plugin metadata (e.g. after exact-version docs arrive) and re-applies it to existing Facts.
+    void reloadFirmwareMetaData();
+
+    /// File the firmware-plugin metadata came from; empty when the vehicle supplied its own metadata.
+    QString firmwareMetaDataFile();
+
+signals:
+    void firmwareMetaDataReloaded();
+
 private:
     ParameterMetaData *_getParameterMetaData();
     FactMetaData *_resolveMetaData(const QString &name, FactMetaData::ValueType_t valueType);

@@ -581,6 +581,12 @@ QString FirmwarePlugin::_cachedParameterMetaDataFile(const Vehicle *vehicle) con
         return internalFile;
     }
 
+    const QString exactFile = _exactParameterMetaDataFile(vehicle);
+    if (!exactFile.isEmpty()) {
+        qCDebug(FirmwarePluginLog) << "Using exact-version parameter metadata:" << exactFile;
+        return exactFile;
+    }
+
     QVersionNumber internalVersion = ParameterMetaData::versionFromFileName(internalFile);
     if (internalVersion.isNull()) {
         internalVersion = ParameterMetaData::versionFromMetaDataFile(internalFile);

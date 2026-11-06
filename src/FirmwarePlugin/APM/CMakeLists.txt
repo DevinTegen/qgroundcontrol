@@ -11,6 +11,8 @@ target_sources(
     ${CMAKE_PROJECT_NAME}
     PRIVATE
         APM.h
+        APMExactParamDocs.cc
+        APMExactParamDocs.h
         APMFirmwarePlugin.cc
         APMFirmwarePlugin.h
         APMParameterMetaData.cc
