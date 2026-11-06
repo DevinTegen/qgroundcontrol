@@ -6,6 +6,7 @@ class APMAirframeComponent;
 class APMAirspeedComponent;
 class APMFlightModesComponent;
 class APMRadioComponent;
+class APMRCMappingComponent;
 class APMTuningComponent;
 class APMAdvancedTuningCopterComponent;
 class APMFailsafesComponent;
@@ -53,6 +54,7 @@ protected:
     APMESCComponent *_escComponent = nullptr;
     APMMotorComponent *_motorComponent = nullptr;
     APMRadioComponent *_radioComponent = nullptr;
+    APMRCMappingComponent *_rcMappingComponent = nullptr;
     APMFailsafesComponent *_failsafesComponent = nullptr;
     APMFlightSafetyComponent *_flightSafetyComponent = nullptr;
     APMSensorsComponent *_sensorsComponent = nullptr;

@@ -10,6 +10,7 @@
 #include "APMESCComponent.h"
 #include "APMPowerComponent.h"
 #include "APMRadioComponent.h"
+#include "APMRCMappingComponent.h"
 #include "APMLoggingComponent.h"
 #include "APMRemoteSupportComponent.h"
 #include "APMFailsafesComponent.h"
@@ -70,6 +71,10 @@ const QVariantList &APMAutoPilotPlugin::vehicleComponents()
                 _radioComponent = new APMRadioComponent(_vehicle, this);
                 _radioComponent->setupTriggerSignals();
                 _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_radioComponent)));
+
+                _rcMappingComponent = new APMRCMappingComponent(_vehicle, this);
+                _rcMappingComponent->setupTriggerSignals();
+                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_rcMappingComponent)));
             }
 
             // No flight modes component for Sub versions 3.5 and up

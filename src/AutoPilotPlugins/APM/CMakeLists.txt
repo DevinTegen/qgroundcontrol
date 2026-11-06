@@ -36,6 +36,10 @@ target_sources(
         APMLoggingComponent.h
         APMMotorComponent.cc
         APMMotorComponent.h
+        APMRCMappingComponent.cc
+        APMRCMappingComponent.h
+        APMRCMappingController.cc
+        APMRCMappingController.h
         APMServoComponent.cc
         APMServoComponent.h
         APMPowerComponent.cc
@@ -125,6 +129,8 @@ qt_add_qml_module(
         APMNotSupported.qml
         APMPowerComponentSummary.qml
         APMRadioComponentSummary.qml
+        APMRCMappingComponent.qml
+        APMRCMappingComponentSummary.qml
         APMRemoteSupportComponent.qml
         APMFlightSafetyComponentSub.qml
         APMFlightSafetyComponentSummary.qml
