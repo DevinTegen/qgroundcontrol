@@ -119,6 +119,10 @@ function renderConnect() {
     if (!webSerialSupported()) {
       opts += '<span class="note">USB needs Chrome or Edge on a computer (Web Serial). Safari, Firefox and phones can\'t open serial ports.</span>';
     }
+  } else if (settings.link === 'sitl') {
+    const url = settings[`url.${settings.link}`] || t.url;
+    opts = `<label>Simulator address<input id="wsUrl" size="34" value="${esc(url)}"></label>
+      ${bridgeInfo ? '' : '<span class="note">The simulator must be running first, in a GitHub Codespace or on your computer (see the list below). Then open the simulator\'s own link instead of this page; it connects by itself. 127.0.0.1 only works when the simulator runs on this same computer.</span>'}`;
   } else {
     const url = settings[`url.${settings.link}`] || t.url;
     opts = `<label>Bridge address<input id="wsUrl" size="34" value="${esc(url)}"></label>
