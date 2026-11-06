@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - 'Stable*'
+      - 'feat/**'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
     paths-ignore:
