@@ -28,8 +28,15 @@ public:
         FavColumn = 0,
         NameColumn,
         ValueColumn,
+        DefaultColumn,
+        UnitsColumn,
+        OptionsColumn,
         DescriptionColumn,
+        ColumnCount
     };
+
+    /// Mission Planner style summary of a parameter's allowed values: enum list, bitmask or range.
+    static QString optionsText(Fact* fact, int maxLength = -1);
 
     Q_PROPERTY(int rowCount READ rowCount NOTIFY rowCountChanged)
 
@@ -53,7 +60,7 @@ public:
 private:
     bool _isResetting() const { return _resetNestingCount > 0; }
 
-    int                 _tableViewColCount = 4;
+    int                 _tableViewColCount = ColumnCount;
     QList<ColumnData>   _tableData;
     uint                _resetNestingCount = 0;
 };
@@ -138,6 +145,11 @@ class ParameterEditorController : public FactPanelController
     Q_PROPERTY(bool                 showFavoritesOnly       MEMBER _showFavoritesOnly                                   NOTIFY showFavoritesOnlyChanged)
     Q_PROPERTY(bool                 hideReadOnly            MEMBER _hideReadOnly                                        NOTIFY hideReadOnlyChanged)
     Q_PROPERTY(QStringList          favoriteParameterNames  READ favoriteParameterNames                                 NOTIFY favoritesChanged)
+    Q_PROPERTY(bool                 showUndocumentedOnly    MEMBER _showUndocumentedOnly                                NOTIFY showUndocumentedOnlyChanged)
+    Q_PROPERTY(QString              metaDataDescription     READ metaDataDescription                                    NOTIFY statsChanged)
+    Q_PROPERTY(int                  modifiedCount           READ modifiedCount                                          NOTIFY statsChanged)
+    Q_PROPERTY(int                  undocumentedCount       READ undocumentedCount                                      NOTIFY statsChanged)
+    Q_PROPERTY(bool                 defaultsAvailable       READ defaultsAvailable                                      NOTIFY statsChanged)
 
     // These property are related to the diff associated with a load from file
     Q_PROPERTY(bool                 diffOtherVehicle        READ diffOtherVehicle                                       NOTIFY diffOtherVehicleChanged)
@@ -166,6 +178,14 @@ public:
     Q_INVOKABLE void toggleFavorite                 (const QString& paramName);
     Q_INVOKABLE bool isFavorite                     (const QString& paramName) const;
     Q_INVOKABLE void clearAllFavorites              (void);
+    Q_INVOKABLE void resetToDefault                 (Fact* fact);
+    Q_INVOKABLE QString optionsText                 (Fact* fact) const { return ParameterTableModel::optionsText(fact); }
+    Q_INVOKABLE void updateStats                    (void);
+
+    QString metaDataDescription (void) const { return _metaDataDescription; }
+    int     modifiedCount       (void) const { return _modifiedCount; }
+    int     undocumentedCount   (void) const { return _undocumentedCount; }
+    bool    defaultsAvailable   (void) const { return _defaultsAvailable; }
 
     QObject*            currentCategory         (void) { return _currentCategory; }
     QObject*            currentGroup            (void) { return _currentGroup; }
@@ -192,6 +212,8 @@ signals:
     void showModifiedOnlyChanged        (void);
     void showFavoritesOnlyChanged       (void);
     void hideReadOnlyChanged            (void);
+    void showUndocumentedOnlyChanged    (void);
+    void statsChanged                   (void);
     void favoritesChanged               (void);
     void diffOtherVehicleChanged        (bool diffOtherVehicle);
     void diffMultipleComponentsChanged  (bool diffMultipleComponents);
@@ -216,6 +238,8 @@ private slots:
 
 private:
     bool _shouldShow(Fact *fact) const;
+    static bool _isUndocumented(Fact *fact);
+    void _firmwareMetaDataReloaded();
     void _performSearch();
     void _loadFavorites();
     void _saveFavorites();
@@ -239,6 +263,11 @@ private:
     bool                        _showModifiedOnly       = false;
     bool                        _showFavoritesOnly      = false;
     bool                        _hideReadOnly           = false;
+    bool                        _showUndocumentedOnly   = false;
+    QString                     _metaDataDescription;
+    int                         _modifiedCount          = 0;
+    int                         _undocumentedCount      = 0;
+    bool                        _defaultsAvailable      = false;
     bool                        _diffOtherVehicle       = false;
     bool                        _diffMultipleComponents = false;
     int                         _diffParsedCount        = 0;

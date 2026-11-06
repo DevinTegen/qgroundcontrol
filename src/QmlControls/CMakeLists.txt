@@ -141,6 +141,7 @@ qt_add_qml_module(
         MissionCommandDialog.qml
         MvPanelPage.qml
         OfflineMapButton.qml
+        ParameterDetailsPane.qml
         ParameterDiffDialog.qml
         ParameterEditor.qml
         ParameterEditorDialog.qml

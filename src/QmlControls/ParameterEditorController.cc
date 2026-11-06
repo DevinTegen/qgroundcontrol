@@ -1,10 +1,15 @@
 #include "ParameterEditorController.h"
 
+#include <bit>
+#include <cmath>
 #include <limits>
 #include <type_traits>
 
 #include "AppMessages.h"
 #include "AppSettings.h"
+#include "CompInfoParam.h"
+#include "ComponentInformationManager.h"
+#include "FirmwarePlugin.h"
 #include "ParameterManager.h"
 #include "QGCLoggingCategory.h"
 #include "QmlObjectListModel.h"
@@ -67,6 +72,9 @@ QVariant ParameterTableModel::headerData(int section, Qt::Orientation orientatio
     case FavColumn:         return tr("Fav");
     case NameColumn:        return tr("Name");
     case ValueColumn:       return tr("Value");
+    case DefaultColumn:     return tr("Default");
+    case UnitsColumn:       return tr("Units");
+    case OptionsColumn:     return tr("Options");
     case DescriptionColumn: return tr("Description");
     default:                return QVariant();
     }
@@ -103,6 +111,9 @@ void ParameterTableModel::insert(int row, Fact* fact)
     colData[FavColumn] = QString();
     colData[NameColumn] = fact->name();
     colData[ValueColumn] = QVariant::fromValue(fact);
+    colData[DefaultColumn] = fact->defaultValueAvailable() ? fact->cookedDefaultValueString() : QString();
+    colData[UnitsColumn] = fact->cookedUnits();
+    colData[OptionsColumn] = optionsText(fact, 60);
     colData[DescriptionColumn] = fact->shortDescription();
 
     if (!_isResetting()) {
@@ -113,6 +124,48 @@ void ParameterTableModel::insert(int row, Fact* fact)
         endInsertRows();
         emit rowCountChanged(rowCount());
     }
+}
+
+QString ParameterTableModel::optionsText(Fact* fact, int maxLength)
+{
+    if (!fact) {
+        return QString();
+    }
+
+    QString text;
+    const QStringList bitmaskStrings = fact->bitmaskStrings();
+    const QStringList enumStrings = fact->enumStrings();
+    if (!bitmaskStrings.isEmpty()) {
+        const QVariantList bitmaskValues = fact->bitmaskValues();
+        QStringList items;
+        for (qsizetype i = 0; i < bitmaskStrings.size(); i++) {
+            // Bitmask values are bit masks (1, 2, 4...), ArduPilot docs list bit numbers.
+            const quint64 mask = (i < bitmaskValues.size()) ? bitmaskValues[i].toULongLong() : 0;
+            const int bit = mask ? std::countr_zero(mask) : static_cast<int>(i);
+            items.append(QStringLiteral("%1:%2").arg(bit).arg(bitmaskStrings[i]));
+        }
+        text = tr("Bitmask: %1").arg(items.join(QStringLiteral(", ")));
+    } else if (!enumStrings.isEmpty()) {
+        const QVariantList enumValues = fact->enumValues();
+        QStringList items;
+        for (qsizetype i = 0; i < enumStrings.size(); i++) {
+            const QString value = (i < enumValues.size()) ? enumValues[i].toString() : QString();
+            items.append(QStringLiteral("%1:%2").arg(value, enumStrings[i]));
+        }
+        text = items.join(QStringLiteral(", "));
+    } else if (!fact->minIsDefaultForType() || !fact->maxIsDefaultForType()) {
+        const QString minText = fact->minIsDefaultForType() ? QString() : fact->cookedMinString();
+        const QString maxText = fact->maxIsDefaultForType() ? QString() : fact->cookedMaxString();
+        text = tr("%1 to %2").arg(minText, maxText).trimmed();
+        if (fact->rawIncrement() > 0 && !std::isnan(fact->rawIncrement())) {
+            text += tr(" (step %1)").arg(fact->rawIncrement());
+        }
+    }
+
+    if (maxLength > 0 && text.length() > maxLength) {
+        text = text.left(maxLength - 1) + QChar(0x2026);
+    }
+    return text;
 }
 
 void ParameterTableModel::beginReset()
@@ -173,11 +226,19 @@ ParameterEditorController::ParameterEditorController(QObject *parent)
     connect(this, &ParameterEditorController::hideReadOnlyChanged,     this, &ParameterEditorController::_hideReadOnlyChanged);
     connect(&_searchTimer, &QTimer::timeout,                            this, &ParameterEditorController::_performSearch);
     connect(_parameterMgr, &ParameterManager::factAdded,                this, &ParameterEditorController::_factAdded);
+    connect(this, &ParameterEditorController::showUndocumentedOnlyChanged, this, &ParameterEditorController::_searchTextChanged);
+    connect(_parameterMgr, &ParameterManager::parametersReadyChanged,   this, &ParameterEditorController::updateStats);
+    ComponentInformationManager* compInfoMgr = _vehicle ? _vehicle->compInfoManager() : nullptr;
+    if (CompInfoParam* compInfoParam = compInfoMgr ? compInfoMgr->compInfoParam(MAV_COMP_ID_AUTOPILOT1) : nullptr) {
+        connect(compInfoParam, &CompInfoParam::firmwareMetaDataReloaded, this, &ParameterEditorController::_firmwareMetaDataReloaded);
+    }
 
     _loadFavorites();
 
     ParameterEditorCategory* category = _categories.count() ? _categories.value<ParameterEditorCategory*>(0) : nullptr;
     setCurrentCategory(category);
+
+    updateStats();
 }
 
 ParameterEditorController::~ParameterEditorController()
@@ -777,7 +838,67 @@ bool ParameterEditorController::_shouldShow(Fact* fact) const
             return false;
         }
     }
+    if (_showUndocumentedOnly && !_isUndocumented(fact)) {
+        return false;
+    }
     return true;
+}
+
+bool ParameterEditorController::_isUndocumented(Fact* fact)
+{
+    return fact->shortDescription().isEmpty() && fact->longDescription().isEmpty();
+}
+
+void ParameterEditorController::resetToDefault(Fact* fact)
+{
+    if (!fact || !fact->defaultValueAvailable() || fact->readOnly()) {
+        return;
+    }
+    fact->setRawValue(fact->rawDefaultValue());
+}
+
+void ParameterEditorController::updateStats(void)
+{
+    int modified = 0;
+    int undocumented = 0;
+    bool defaultsAvailable = false;
+
+    for (const QString& name : _parameterMgr->parameterNames(MAV_COMP_ID_AUTOPILOT1)) {
+        Fact* fact = _parameterMgr->getParameter(MAV_COMP_ID_AUTOPILOT1, name);
+        if (fact->defaultValueAvailable()) {
+            defaultsAvailable = true;
+            if (!fact->valueEqualsDefault()) {
+                modified++;
+            }
+        }
+        if (_isUndocumented(fact)) {
+            undocumented++;
+        }
+    }
+
+    QString description;
+    ComponentInformationManager* compInfoMgr = _vehicle ? _vehicle->compInfoManager() : nullptr;
+    if (CompInfoParam* compInfoParam = compInfoMgr ? compInfoMgr->compInfoParam(MAV_COMP_ID_AUTOPILOT1) : nullptr) {
+        const QString file = compInfoParam->firmwareMetaDataFile();
+        description = file.isEmpty() ? tr("Supplied by the vehicle") : _vehicle->firmwarePlugin()->parameterMetaDataDescription(file);
+    }
+
+    _modifiedCount = modified;
+    _undocumentedCount = undocumented;
+    _defaultsAvailable = defaultsAvailable;
+    _metaDataDescription = description;
+    emit statsChanged();
+}
+
+void ParameterEditorController::_firmwareMetaDataReloaded()
+{
+    _buildLists();
+    ParameterEditorCategory* category = _categories.count() ? _categories.value<ParameterEditorCategory*>(0) : nullptr;
+    setCurrentCategory(category);
+    if (!_searchText.isEmpty() || _showModifiedOnly || _showFavoritesOnly || _showUndocumentedOnly) {
+        _performSearch();
+    }
+    updateStats();
 }
 
 void ParameterEditorController::_searchTextChanged(void)
@@ -793,7 +914,7 @@ void ParameterEditorController::_hideReadOnlyChanged(void)
     setCurrentCategory(category);
 
     // Re-trigger search if active
-    if (!_searchText.isEmpty() || _showModifiedOnly) {
+    if (!_searchText.isEmpty() || _showModifiedOnly || _showFavoritesOnly || _showUndocumentedOnly) {
         _performSearch();
     }
 }
@@ -804,7 +925,9 @@ void ParameterEditorController::_performSearch(void)
 
     QStringList rgSearchStrings = _searchText.split(' ', Qt::SkipEmptyParts);
 
-    if (rgSearchStrings.isEmpty() && !_showModifiedOnly && !_showFavoritesOnly) {
+    updateStats();
+
+    if (rgSearchStrings.isEmpty() && !_showModifiedOnly && !_showFavoritesOnly && !_showUndocumentedOnly) {
         ParameterEditorCategory* category = _categories.count() ? _categories.value<ParameterEditorCategory*>(0) : nullptr;
         setCurrentCategory(category);
         _searchParameters.clear();

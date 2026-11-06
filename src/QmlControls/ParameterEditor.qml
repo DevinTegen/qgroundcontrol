@@ -13,7 +13,7 @@ Item {
     property Fact   _editorDialogFact: Fact { }
     property int    _rowHeight:         ScreenTools.defaultFontPixelHeight * 2
     property int    _rowWidth:          10 // Dynamic adjusted at runtime
-    property bool   _searchFilter:      searchText.text.trim() != "" || controller.showModifiedOnly || controller.showFavoritesOnly  ///< true: showing results of search
+    property bool   _searchFilter:      searchText.text.trim() != "" || controller.showModifiedOnly || controller.showFavoritesOnly || controller.showUndocumentedOnly  ///< true: showing results of search
     property var    _searchResults      ///< List of parameter names from search results
     property var    _activeVehicle:     QGroundControl.multiVehicleManager.activeVehicle
     property bool   _showRCToParam:     _activeVehicle.px4Firmware
@@ -21,6 +21,8 @@ Item {
     property var    _controller:        controller
     property var    _favorites:         controller.favoriteParameterNames
     property real   _margins:           ScreenTools.defaultFontPixelHeight / 2
+    property var    _selectedFact:      null
+    readonly property int _lastColumn:  6
 
     ParameterEditorController {
         id: controller
@@ -183,23 +185,59 @@ Item {
         }
     }
 
-    QGCGroupBox {
+    RowLayout {
+        id:                 docsStatus
         anchors.left:       parent.left
         anchors.right:      parent.right
         anchors.top:        header.bottom
+        anchors.topMargin:  _margins / 2
+        spacing:            ScreenTools.defaultFontPixelWidth
+
+        QGCLabel {
+            Layout.fillWidth:   true
+            text:               qsTr("Parameter docs: %1").arg(controller.metaDataDescription)
+            color:              qgcPal.textSecondary
+            elide:              Text.ElideRight
+        }
+
+        QGCLabel {
+            visible:    controller.undocumentedCount > 0
+            text:       qsTr("%1 parameters on this vehicle are not in these docs").arg(controller.undocumentedCount)
+            color:      qgcPal.warningText
+        }
+    }
+
+    QGCGroupBox {
+        id:                 paramGroupBox
+        anchors.left:       parent.left
+        anchors.right:      parent.right
+        anchors.top:        docsStatus.bottom
         anchors.topMargin:  _margins
-        anchors.bottom:     parent.bottom
+        anchors.bottom:     detailsPane.top
+        anchors.bottomMargin: _margins
         showDividers:       false
         contentSpacing:     0
 
         onCurrentIndexChanged: {
-            controller.showModifiedOnly  = (currentIndex === 1)
-            controller.showFavoritesOnly = (currentIndex === 2)
+            controller.showModifiedOnly     = (currentIndex === 1)
+            controller.showFavoritesOnly    = (currentIndex === 2)
+            controller.showUndocumentedOnly = (currentIndex === 3)
         }
 
         QGCGroupBoxTab { title: qsTr("Full List") }
-        QGCGroupBoxTab { title: qsTr("Modified") }
+        QGCGroupBoxTab { title: controller.defaultsAvailable ? qsTr("Modified (%1)").arg(controller.modifiedCount) : qsTr("Modified") }
         QGCGroupBoxTab { title: qsTr("Favorites") }
+        QGCGroupBoxTab { title: qsTr("Undocumented (%1)").arg(controller.undocumentedCount) }
+
+        QGCLabel {
+            Layout.fillWidth:   true
+            visible:            paramGroupBox.currentIndex === 1
+            wrapMode:           Text.WordWrap
+            color:              qgcPal.textSecondary
+            text:               controller.defaultsAvailable
+                                ? qsTr("Parameters whose current value differs from the firmware default. Select one to see the default and revert it.")
+                                : qsTr("This vehicle has not reported its default values, so modified parameters can't be identified. ArduPilot 4.1 or newer reports them when parameters are downloaded over MAVLink FTP.")
+        }
 
         Item {
             Layout.fillWidth:   true
@@ -312,7 +350,7 @@ Item {
                         height:         parent.height
                         width:          1
                         color:          qgcPal.borderSubtle
-                        visible:        column == 3
+                        visible:        column == _lastColumn
                     }
 
                     // Bottom border
@@ -357,9 +395,11 @@ Item {
                     implicitWidth:  column === 0 ? ScreenTools.implicitCheckBoxHeight + ScreenTools.defaultFontPixelWidth
                                                  : column === 1 ? nameRow.implicitWidth + ScreenTools.defaultFontPixelWidth
                                                  : column === 2 ? ScreenTools.defaultFontPixelWidth * 16
+                                                 : column === 3 ? Math.min(label.contentWidth, ScreenTools.defaultFontPixelWidth * 12) + ScreenTools.defaultFontPixelWidth
+                                                 : column === 5 ? Math.min(label.contentWidth, ScreenTools.defaultFontPixelWidth * 34) + ScreenTools.defaultFontPixelWidth
                                                                 : label.contentWidth + ScreenTools.defaultFontPixelWidth
                     implicitHeight: label.contentHeight + ScreenTools.defaultFontPixelHeight * 0.5
-                    color:          row % 2 === 0 ? "transparent" : qgcPal.windowCard
+                    color:          fact === _selectedFact ? qgcPal.accentSubtle : (row % 2 === 0 ? "transparent" : qgcPal.windowCard)
                     clip:           true
 
                     // Bottom grid line
@@ -384,7 +424,7 @@ Item {
                         height:         parent.height
                         width:          1
                         color:          qgcPal.borderSubtle
-                        visible:        column == 3
+                        visible:        column == _lastColumn
                     }
 
                     QGCCheckBox {
@@ -426,12 +466,16 @@ Item {
                         anchors.left:       parent.left
                         anchors.leftMargin: ScreenTools.defaultFontPixelWidth / 2
                         anchors.verticalCenter: parent.verticalCenter
-                        width:              column == 2 ? ScreenTools.defaultFontPixelWidth * 15 : implicitWidth
+                        width:              column == 2 ? ScreenTools.defaultFontPixelWidth * 15
+                                            : column == 3 ? Math.min(implicitWidth, ScreenTools.defaultFontPixelWidth * 12)
+                                            : column == 5 ? Math.min(implicitWidth, ScreenTools.defaultFontPixelWidth * 34)
+                                                          : implicitWidth
                         text:               column == 2 ? col1String() : display
-                        color:              column == 2 && fact.defaultValueAvailable && !fact.valueEqualsDefault ? qgcPal.modifiedParamValue : qgcPal.textPrimary
+                        color:              column == 2 && fact.defaultValueAvailable && !fact.valueEqualsDefault ? qgcPal.modifiedParamValue
+                                            : (column == 3 || column == 4 || column == 5) ? qgcPal.textSecondary : qgcPal.textPrimary
                         font.bold:          column == 2 && fact.defaultValueAvailable && !fact.valueEqualsDefault
                         maximumLineCount:   1
-                        elide:              column == 2 ? Text.ElideRight : Text.ElideNone
+                        elide:              (column == 2 || column == 3 || column == 5) ? Text.ElideRight : Text.ElideNone
 
                         function col1String() {
                             if (fact.enumStrings.length === 0) {
@@ -444,10 +488,18 @@ Item {
                         }
                     }
 
+                    // Value column edits directly (Mission Planner style); other columns select the row for the details pane
                     QGCMouseArea {
                         anchors.fill: parent
                         visible:      column !== 0
                         onClicked: mouse => {
+                            _selectedFact = fact
+                            if (column === 2) {
+                                _editorDialogFact = fact
+                                editorDialogFactory.open()
+                            }
+                        }
+                        onDoubleClicked: mouse => {
                             _editorDialogFact = fact
                             editorDialogFactory.open()
                         }
@@ -455,5 +507,22 @@ Item {
                 }
             }
         }
+    }
+
+    ParameterDetailsPane {
+        id:             detailsPane
+        anchors.left:   parent.left
+        anchors.right:  parent.right
+        anchors.bottom: parent.bottom
+        height:         ScreenTools.defaultFontPixelHeight * 11
+        fact:           _selectedFact
+        optionsText:    _selectedFact ? controller.optionsText(_selectedFact) : ""
+        docsText:       controller.metaDataDescription
+
+        onEditClicked: {
+            _editorDialogFact = _selectedFact
+            editorDialogFactory.open()
+        }
+        onResetClicked: controller.resetToDefault(_selectedFact)
     }
 }
